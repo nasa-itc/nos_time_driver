@@ -112,8 +112,13 @@ namespace Nos3
 
                     if(_time_bus->is_connected())
                     {
-                        sim_logger->info("TimeDriver::send_tick_to_nos_engine: tick = %d, absolute time %f\n",
-                            _time_counter, _absolute_start_time + (double(_time_counter * _sim_microseconds_per_tick)) / 1000000.0);
+                        int64_t sim_time_us = _time_counter * _sim_microseconds_per_tick;
+
+                        if ((sim_time_us % 1000000) == 0)
+                        {
+                            sim_logger->info("TimeDriver::send_tick_to_nos_engine: tick = %d, absolute time %f\n",
+                                _time_counter, _absolute_start_time + ((double)sim_time_us / 1000000.0));
+                        }
 
                         _time_bus->set_time(_time_counter++);
                     }
