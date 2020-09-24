@@ -50,7 +50,6 @@ namespace Nos3
 
         TimeDriver(const boost::property_tree::ptree& config) : SimIHardwareModel(config),
             _active(config.get("simulator.active", true)),
-            _real_microseconds_per_tick(config.get("simulator.hardware-model.real-microseconds-per-tick", 1000000)),
             _time_uri(config.get("common.nos-connection-string", "tcp://127.0.0.1:12001")),
             _time_bus_name("command"),
             _time_counter(0)
@@ -139,7 +138,6 @@ namespace Nos3
     private:
         // Private data
         const bool                                     _active;
-        const int64_t                                  _real_microseconds_per_tick;
 
         std::string                                    _time_uri;
         std::string                                    _time_bus_name;
