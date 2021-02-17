@@ -47,7 +47,6 @@ namespace Nos3
     private:
         // Private data
         const bool                                     _active;
-        const int64_t                                  _real_microseconds_per_tick;
 
         std::string                                    _time_uri;
         std::string                                    _time_bus_name;
