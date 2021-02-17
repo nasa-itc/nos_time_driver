@@ -44,7 +44,6 @@ namespace Nos3
 
     TimeDriver::TimeDriver(const boost::property_tree::ptree& config) : SimIHardwareModel(config),
         _active(config.get("simulator.active", true)),
-        _real_microseconds_per_tick(config.get("simulator.hardware-model.real-microseconds-per-tick", 1000000)),
         _time_uri(config.get("common.nos-connection-string", "tcp://127.0.0.1:12001")),
         _time_bus_name("command"),
         _time_counter(0)
@@ -100,14 +99,17 @@ namespace Nos3
     {
         if (_active) 
         {
+			int64_t ticks_per_second = 1000000/_real_microseconds_per_tick;
             while (1) 
             {
                 std::this_thread::sleep_for(std::chrono::microseconds(_real_microseconds_per_tick));
 
                 if(_time_bus->is_connected())
                 {
-                    sim_logger->info("TimeDriver::send_tick_to_nos_engine: tick = %d, absolute time %f\n",
-                        _time_counter, _absolute_start_time + (double(_time_counter * _sim_microseconds_per_tick)) / 1000000.0);
+					if ((_time_counter % ticks_per_second) == 0) { // only report every second
+						sim_logger->info("TimeDriver::send_tick_to_nos_engine: tick = %d, absolute time %f\n",
+							_time_counter, _absolute_start_time + (double(_time_counter * _sim_microseconds_per_tick)) / 1000000.0);
+					}
 
                     _time_bus->set_time(_time_counter++);
                 }
