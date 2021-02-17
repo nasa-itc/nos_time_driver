@@ -1,13 +1,14 @@
 project(nos_time_driver)
 
-find_package(Boost REQUIRED QUIET COMPONENTS program_options filesystem)
+find_package(Boost REQUIRED QUIET COMPONENTS system program_options filesystem)
 find_package(ITC_Common REQUIRED QUIET COMPONENTS itc_logger)
 find_package(NOSENGINE REQUIRED QUIET COMPONENTS common transport client server)
 
 include_directories(inc
                     ${sim_common_SOURCE_DIR}/inc
                     ${ITC_Common_INCLUDE_DIRS}
-                    ${NOSENGINE_INCLUDE_DIRS})
+                    ${NOSENGINE_INCLUDE_DIRS}
+					${Boost_INCLUDE_DIRS})
 
 set(nos_time_driver_src
     src/time_driver.cpp
