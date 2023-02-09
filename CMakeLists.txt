@@ -29,7 +29,3 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH}:$ORIGIN/../lib") # Pick up .so i
 add_library(nos_time_driver SHARED ${nos_time_driver_src} ${nos_time_driver_inc})
 target_link_libraries(nos_time_driver ${nos_time_driver_libs})
 install(TARGETS nos_time_driver LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
-
-add_executable(nos-time-driver src/nos_time_driver.cpp)
-target_link_libraries(nos-time-driver nos_time_driver ${nos_time_driver_libs})
-install(TARGETS nos-time-driver RUNTIME DESTINATION bin)
