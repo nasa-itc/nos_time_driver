@@ -67,7 +67,7 @@ namespace Nos3
                     // v.second is the child tree.
                     if (v.second.get("type", "").compare("time") == 0) {
                         tbi.time_bus_name = v.second.get("bus-name", default_time_bus_name);
-                        tbi.time_uri = v.second.get("nos-connection-string", default_time_uri);
+                        tbi.time_uri = v.second.get("nos-connection-string-override", default_time_uri);
                         bool found = false;
                         // Prefer slow search of vector in constructor so that the run method has fast indexing/iteration
                         for (int i = 0; i < _time_bus_info.size(); i++) {
