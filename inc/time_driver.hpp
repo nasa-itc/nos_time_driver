@@ -47,10 +47,13 @@ namespace Nos3
     private:
         // Private data
         const bool                                     _active;
-
-        std::string                                    _time_uri;
-        std::string                                    _time_bus_name;
         unsigned int                                   _time_counter;
-        std::unique_ptr<NosEngine::Client::Bus>        _time_bus;
+
+        struct TimeBusInfo {
+            std::string                                 time_uri;
+            std::string                                 time_bus_name;
+            std::unique_ptr<NosEngine::Client::Bus>     time_bus;
+        };
+        std::vector<TimeBusInfo>                        _time_bus_info;
     };
 }

@@ -44,25 +44,15 @@ namespace Nos3
 
     TimeDriver::TimeDriver(const boost::property_tree::ptree& config) : SimIHardwareModel(config),
         _active(config.get("simulator.active", true)),
-        _time_uri(config.get("common.nos-connection-string", "tcp://127.0.0.1:12001")),
-        _time_bus_name("command"),
         _time_counter(0)
     {
-        std::string type = config.get("simulator.hardware-model.type", "");
-
-        if ((type.compare("") == 0) /* no type found in the config ok */ &&
-            (type.compare("time-simulator") != 0) /* otherwise this has to be the type or die */) 
-        {
-            std::ostringstream oss;
-            oss << "TimeDriver::TimeDriver:  Exception!  Incorrect simulator type "
-                << type << "; expected 'time-simulator'.";
-            throw new std::runtime_error(oss.str());
-        }
+        std::string default_time_uri = config.get("common.nos-connection-string", "tcp://127.0.0.1:12001");
+        std::string default_time_bus_name = "command";
+        struct TimeBusInfo tbi;
 
         if (_active) 
         {
             sim_logger->debug("TimeDriver::TimeDriver: Creating time sender\n");
-            std::string node_name = "TimeDriver";
 
             // Use config data if it exists
             if (config.get_child_optional("simulator.hardware-model.connections")) 
@@ -76,16 +66,25 @@ namespace Nos3
                     // v.first is the name of the child.
                     // v.second is the child tree.
                     if (v.second.get("type", "").compare("time") == 0) {
-                        _time_bus_name = v.second.get("bus-name", _time_bus_name);
-                        node_name = v.second.get("node-name", node_name);
-                        break;
+                        tbi.time_bus_name = v.second.get("bus-name", default_time_bus_name);
+                        tbi.time_uri = v.second.get("nos-connection-string-override", default_time_uri);
+                        bool found = false;
+                        // Prefer slow search of vector in constructor so that the run method has fast indexing/iteration
+                        for (int i = 0; i < _time_bus_info.size(); i++) {
+                            if ((tbi.time_bus_name.compare(_time_bus_info[i].time_bus_name) == 0) &&
+                                (tbi.time_uri.compare(_time_bus_info[i].time_uri) == 0)              ) {
+                                    found = true;
+                                    break;
+                            }
+                        }
+                        if (!found) {
+                            tbi.time_bus.reset(new NosEngine::Client::Bus(_hub, tbi.time_uri, tbi.time_bus_name));
+                            tbi.time_bus->enable_set_time();
+                            _time_bus_info.push_back(std::move(tbi));
+                        }
                     }
                 }
             }
-
-            // Create the bus and node with defaults even if there is no config data... this node is the only reason for the time driver to exist
-            _time_bus.reset(new NosEngine::Client::Bus(_hub, _time_uri, _time_bus_name));
-            _time_bus->enable_set_time();
 
             sim_logger->debug("TimeDriver::TimeDriver: Time sender created!\n");
         }
@@ -100,25 +99,27 @@ namespace Nos3
         if (_active) 
         {
 			int64_t ticks_per_second = 1000000/_real_microseconds_per_tick;
+            std::size_t N = _time_bus_info.size();
             while (1) 
             {
                 std::this_thread::sleep_for(std::chrono::microseconds(_real_microseconds_per_tick));
-
-                if(_time_bus->is_connected())
-                {
-					if ((_time_counter % ticks_per_second) == 0) { // only report every second
-						sim_logger->info("TimeDriver::send_tick_to_nos_engine: tick = %d, absolute time %f\n",
-							_time_counter, _absolute_start_time + (double(_time_counter * _sim_microseconds_per_tick)) / 1000000.0);
-					}
-
-                    _time_bus->set_time(_time_counter++);
+                if ((_time_counter % ticks_per_second) == 0) { // only report every second
+                    sim_logger->info("TimeDriver::send_tick_to_nos_engine: tick = %d, absolute time %f\n",
+                        _time_counter, _absolute_start_time + (double(_time_counter * _sim_microseconds_per_tick)) / 1000000.0);
                 }
-                else
-                {
-                    sim_logger->info("time bus disconnected... reconnecting");
-                    _time_bus.reset(new NosEngine::Client::Bus(_hub, _time_uri, _time_bus_name));
-                    _time_bus->enable_set_time();
+
+                for (int i = 0; i < N; i++) {
+
+                    if(!_time_bus_info[i].time_bus->is_connected())
+                    {
+                        sim_logger->info("time bus disconnected... reconnecting");
+                        _time_bus_info[i].time_bus.reset(new NosEngine::Client::Bus(_hub, _time_bus_info[i].time_uri, _time_bus_info[i].time_bus_name));
+                        _time_bus_info[i].time_bus->enable_set_time();
+                    }
+                    _time_bus_info[i].time_bus->set_time(_time_counter);
                 }
+
+                _time_counter++;
             }
         } 
         else 
