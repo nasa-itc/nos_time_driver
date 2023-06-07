@@ -18,6 +18,7 @@ ivv-itc@lists.nasa.gov
 /* Standard Includes */
 #include <thread>
 #include <string>
+#include <curses.h>
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
@@ -30,6 +31,7 @@ ivv-itc@lists.nasa.gov
 #include <sim_hardware_model_factory.hpp>
 #include <sim_i_hardware_model.hpp>
 #include <sim_config.hpp>
+#include <sim_coordinate_transformations.hpp>
 #include <time_driver.hpp>
 
 namespace Nos3
@@ -98,29 +100,64 @@ namespace Nos3
     {
         if (_active) 
         {
-			int64_t ticks_per_second = 1000000/_real_microseconds_per_tick;
+            initscr();
+            erase();
+            keypad(stdscr, TRUE);
+            nodelay(stdscr, TRUE);
+            noecho();
             std::size_t N = _time_bus_info.size();
+            int key = getch();
+            bool pause = false;
+            int32_t year, month, day, hour, minute;
+            double second;
             while (1) 
             {
                 std::this_thread::sleep_for(std::chrono::microseconds(_real_microseconds_per_tick));
-                if ((_time_counter % ticks_per_second) == 0) { // only report every second
-                    sim_logger->info("TimeDriver::send_tick_to_nos_engine: tick = %d, absolute time %f\n",
-                        _time_counter, _absolute_start_time + (double(_time_counter * _sim_microseconds_per_tick)) / 1000000.0);
+    			int64_t ticks_per_second = 1000000/_real_microseconds_per_tick;
+                if ((_time_counter % ticks_per_second) == 0) { // only report about every second
+                    wmove(stdscr, 0, 0);
+                    double abs_time = _absolute_start_time + (double(_time_counter * _sim_microseconds_per_tick)) / 1000000.0;
+                    SimCoordinateTransformations::AbsTime2YMDHMS(abs_time, year, month, day, hour, minute, second);
+                    double speed_up = ((double)_sim_microseconds_per_tick) / ((double)_real_microseconds_per_tick);
+                    printw("TimeDriver::send_tick_to_nos_engine:\n");
+                    printw("  tick = %d, absolute time = %f = %4.4d/%2.2d/%2.2dT%2.2d:%2.2d:%05.2f\n", _time_counter, abs_time, year, month, day, hour, minute, second);
+                    printw("  real microseconds per tick = %d, ", _real_microseconds_per_tick);
+                    printw("attempted speed-up = %5.2f\n\n", speed_up);
+                    printw("Press: 'p' to pause/unpause,\n       '+' to decrease delay by 2x,\n       '-' to increase delay by 2x\n");
+                    refresh();
                 }
 
-                for (int i = 0; i < N; i++) {
+                switch(key) {
+                case 'p':
+                case 'P':
+                    pause = !pause;
+                    break;
+                case '+':
+                    _real_microseconds_per_tick /= 2;
+                    break;
+                case '-':
+                    _real_microseconds_per_tick *= 2;
+                    break;
+                }
 
-                    if(!_time_bus_info[i].time_bus->is_connected())
-                    {
-                        sim_logger->info("time bus disconnected... reconnecting");
-                        _time_bus_info[i].time_bus.reset(new NosEngine::Client::Bus(_hub, _time_bus_info[i].time_uri, _time_bus_info[i].time_bus_name));
-                        _time_bus_info[i].time_bus->enable_set_time();
+                if (!pause) {
+                    for (int i = 0; i < N; i++) {
+
+                        if(!_time_bus_info[i].time_bus->is_connected())
+                        {
+                            sim_logger->info("time bus disconnected... reconnecting");
+                            _time_bus_info[i].time_bus.reset(new NosEngine::Client::Bus(_hub, _time_bus_info[i].time_uri, _time_bus_info[i].time_bus_name));
+                            _time_bus_info[i].time_bus->enable_set_time();
+                        }
+                        _time_bus_info[i].time_bus->set_time(_time_counter);
                     }
-                    _time_bus_info[i].time_bus->set_time(_time_counter);
+
+                    _time_counter++;
                 }
 
-                _time_counter++;
+                key = getch();
             }
+            endwin();
         } 
         else 
         {
