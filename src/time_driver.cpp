@@ -72,7 +72,7 @@ namespace Nos3
                         tbi.time_uri = v.second.get("nos-connection-string-override", default_time_uri);
                         bool found = false;
                         // Prefer slow search of vector in constructor so that the run method has fast indexing/iteration
-                        for (int i = 0; i < _time_bus_info.size(); i++) {
+                        for (unsigned int i = 0; i < _time_bus_info.size(); i++) {
                             if ((tbi.time_bus_name.compare(_time_bus_info[i].time_bus_name) == 0) &&
                                 (tbi.time_uri.compare(_time_bus_info[i].time_uri) == 0)              ) {
                                     found = true;
@@ -141,7 +141,7 @@ namespace Nos3
                 }
 
                 if (!pause) {
-                    for (int i = 0; i < N; i++) {
+                    for (unsigned int i = 0; i < N; i++) {
 
                         if(!_time_bus_info[i].time_bus->is_connected())
                         {
