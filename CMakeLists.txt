@@ -22,6 +22,7 @@ set(nos_time_driver_libs
     ${Boost_LIBRARIES}
     ${ITC_Common_LIBRARIES}
     ${NOSENGINE_LIBRARIES}
+    ncurses
 )
 
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH}:$ORIGIN/../lib") # Pick up .so in install directory
