@@ -47,7 +47,7 @@ namespace Nos3
         _time_counter(0)
     {
 //        std::string default_time_uri = config.get("common.nos-connection-string", "tcp://127.0.0.1:12001");
-        std::string default_time_uri = config.get("common.nos-connection-string", "tcp://0.0.0.0:12001");
+        std::string default_time_uri = config.get("common.nos-connection-string", "tcp://nos_engine_server:12001");
         std::string default_time_bus_name = "command";
         struct TimeBusInfo tbi;
 
