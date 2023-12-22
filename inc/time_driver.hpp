@@ -48,6 +48,7 @@ namespace Nos3
         void update_display(void);
         void update_time_busses(void);
         double time_diff(void);
+        void command_callback(NosEngine::Common::Message msg); /* Handle backdoor commands to the simulator */
 
         // Private data
         const bool                                     _active;
@@ -62,5 +63,8 @@ namespace Nos3
             std::unique_ptr<NosEngine::Client::Bus>     time_bus;
         };
         std::vector<TimeBusInfo>                        _time_bus_info;
+
+        std::string                                     _command_bus_name;
+        std::unique_ptr<NosEngine::Client::Bus>         _command_bus; /* Standard */
     };
 }

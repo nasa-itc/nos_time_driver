@@ -185,7 +185,7 @@ namespace Nos3
         printw("  tick = %d, absolute time = %f = %4.4d/%2.2d/%2.2dT%2.2d:%2.2d:%05.2f\n", _time_counter, abs_time, year, month, day, hour, minute, second);
         printw("  real microseconds per tick = %d, ", _real_microseconds_per_tick);
         printw("attempted speed-up = %5.2f\n", speed_up);
-        printw("  actual speed-up = %5.2f, state = %s", (speed_up/10)/time_diff(), (_pause_ticks == _time_counter) ? "paused" : ((_pause_ticks < UINT_MAX) && (_pause_ticks > _time_counter)) ? "pausing" : "not paused");
+        printw("  actual speed-up = %5.2f, state = %s", (speed_up/10)/time_diff(), (_pause_ticks <= _time_counter) ? "paused" : ((_pause_ticks < UINT_MAX) && (_pause_ticks > _time_counter)) ? "pausing" : "not paused");
         if ((_pause_ticks < UINT_MAX) && (_pause_ticks > _time_counter)) printw(" at %f", _absolute_start_time + (double(_pause_ticks * _sim_microseconds_per_tick)) / 1000000.0);
         printw("\n\nPress: 'p' to pause/unpause,\n       '+' to decrease delay by 2x,\n       '-' to increase delay by 2x\n");
         printw(    "       'r <number>' to run <number> more seconds,\n       'u <number>' to run until <number> absolute time\n");
@@ -202,6 +202,56 @@ namespace Nos3
         diff = (now - then)/1000000;
 
         return diff;
+    }
+
+    void TimeDriver::command_callback(NosEngine::Common::Message msg)
+    {
+        double pause_duration, pause_at;
+
+        /* Get the data out of the message */
+        NosEngine::Common::DataBufferOverlay dbf(const_cast<NosEngine::Utility::Buffer&>(msg.buffer));
+
+        std::string command = dbf.data;
+        std::string response = "TimeDriver::command_callback:  INVALID COMMAND! (Try HELP)";
+        boost::to_upper(command);
+        if (command.compare(0, 4, "HELP") == 0) 
+        {
+            response = "TimeDriver::command_callback: Valid commands are PAUSE, UNPAUSE, DECREASE, INCREASE, RUN <number>, and UNTIL <number>";
+        }
+        else if (command.compare(0, 5, "PAUSE") == 0) 
+        {
+            _pause_ticks = _time_counter;
+            response = "PAUSE";
+        }
+        else if (command.compare(0, 7, "UNPAUSE") == 0) 
+        {
+            _pause_ticks = UINT_MAX;
+            response = "UNPAUSE";
+        }
+        else if (command.compare(0, 8, "DECREASE") == 0) 
+        {
+            _real_microseconds_per_tick /= 2;
+            response = "DECREASE";
+        }
+        else if (command.compare(0, 8, "INCREASE") == 0) 
+        {
+            _real_microseconds_per_tick *= 2;
+            response = "INCREASE";
+        }
+        else if (command.compare(0, 4, "RUN ") == 0) 
+        {
+            pause_duration = std::stod(command.substr(4)); // number of seconds
+            _pause_ticks = _time_counter + pause_duration * 1000000 / _sim_microseconds_per_tick;
+            response = "RUN";
+        }
+        else if (command.compare(0, 6, "UNTIL ") == 0) 
+        {
+            pause_at = std::stod(command.substr(6)); // absolute time in seconds
+            _pause_ticks = (pause_at - _absolute_start_time) * 1000000 / _sim_microseconds_per_tick;
+            response = "RUN";
+        }
+
+        _command_node->send_reply_message_async(msg, response.size(), response.c_str());
     }
 
 }
