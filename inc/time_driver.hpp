@@ -45,9 +45,16 @@ namespace Nos3
         void run(void);
 
     private:
+        void update_display(void);
+        void update_time_busses(void);
+        double time_diff(void);
+
         // Private data
         const bool                                     _active;
         unsigned int                                   _time_counter;
+        unsigned int                                   _display_counter;
+        struct timeval                                 _now, _then;
+        unsigned int                                   _pause_ticks;
 
         struct TimeBusInfo {
             std::string                                 time_uri;

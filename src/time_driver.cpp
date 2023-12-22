@@ -19,6 +19,7 @@ ivv-itc@lists.nasa.gov
 #include <thread>
 #include <string>
 #include <curses.h>
+#include <climits>
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
@@ -46,7 +47,7 @@ namespace Nos3
 
     TimeDriver::TimeDriver(const boost::property_tree::ptree& config) : SimIHardwareModel(config),
         _active(config.get("simulator.active", true)),
-        _time_counter(0)
+        _time_counter(0), _display_counter(0), _pause_ticks(UINT_MAX)
     {
         std::string default_time_uri = config.get("common.nos-connection-string", "tcp://127.0.0.1:12001");
         std::string default_time_bus_name = "command";
@@ -105,32 +106,23 @@ namespace Nos3
             keypad(stdscr, TRUE);
             nodelay(stdscr, TRUE);
             noecho();
-            std::size_t N = _time_bus_info.size();
             int key = getch();
-            bool pause = false;
-            int32_t year, month, day, hour, minute;
-            double second;
+            double pause_duration, pause_at;
             while (1) 
             {
                 std::this_thread::sleep_for(std::chrono::microseconds(_real_microseconds_per_tick));
     			int64_t ticks_per_second = 1000000/_real_microseconds_per_tick;
-                if ((_time_counter % ticks_per_second) == 0) { // only report about every second
-                    wmove(stdscr, 0, 0);
-                    double abs_time = _absolute_start_time + (double(_time_counter * _sim_microseconds_per_tick)) / 1000000.0;
-                    SimCoordinateTransformations::AbsTime2YMDHMS(abs_time, year, month, day, hour, minute, second);
-                    double speed_up = ((double)_sim_microseconds_per_tick) / ((double)_real_microseconds_per_tick);
-                    printw("TimeDriver::send_tick_to_nos_engine:\n");
-                    printw("  tick = %d, absolute time = %f = %4.4d/%2.2d/%2.2dT%2.2d:%2.2d:%05.2f\n", _time_counter, abs_time, year, month, day, hour, minute, second);
-                    printw("  real microseconds per tick = %d, ", _real_microseconds_per_tick);
-                    printw("attempted speed-up = %5.2f\n\n", speed_up);
-                    printw("Press: 'p' to pause/unpause,\n       '+' to decrease delay by 2x,\n       '-' to increase delay by 2x\n");
-                    refresh();
+                if ((_display_counter % (ticks_per_second/10)) == 0) { // only report about every 1/10th of a second
+                    _then = _now;
+                    gettimeofday(&_now, NULL);
+                    update_display();
                 }
 
                 switch(key) {
                 case 'p':
                 case 'P':
-                    pause = !pause;
+                    if (_pause_ticks == UINT_MAX) _pause_ticks = _time_counter;
+                    else _pause_ticks = UINT_MAX;
                     break;
                 case '+':
                     _real_microseconds_per_tick /= 2;
@@ -138,22 +130,23 @@ namespace Nos3
                 case '-':
                     _real_microseconds_per_tick *= 2;
                     break;
+                case 'r':
+                case 'R':
+                    scanf("%lf", &pause_duration);
+                    _pause_ticks = _time_counter + pause_duration * 1000000 / _sim_microseconds_per_tick;
+                    break;
+                case 'u':
+                case 'U':
+                    scanf("%lf", &pause_at);
+                    _pause_ticks = (pause_at - _absolute_start_time) * 1000000 / _sim_microseconds_per_tick;
+                    break;
                 }
 
-                if (!pause) {
-                    for (unsigned int i = 0; i < N; i++) {
-
-                        if(!_time_bus_info[i].time_bus->is_connected())
-                        {
-                            sim_logger->info("time bus disconnected... reconnecting");
-                            _time_bus_info[i].time_bus.reset(new NosEngine::Client::Bus(_hub, _time_bus_info[i].time_uri, _time_bus_info[i].time_bus_name));
-                            _time_bus_info[i].time_bus->enable_set_time();
-                        }
-                        _time_bus_info[i].time_bus->set_time(_time_counter);
-                    }
-
+                if (_time_counter < _pause_ticks) {
+                    update_time_busses();
                     _time_counter++;
                 }
+                _display_counter++;
 
                 key = getch();
             }
@@ -163,6 +156,52 @@ namespace Nos3
         {
             sim_logger->info("TimeDriver::run:  Time driver is not active");
         }
+    }
+
+    void TimeDriver::update_time_busses(void)
+    {
+        for (unsigned int i = 0; i < _time_bus_info.size(); i++) {
+
+            if(!_time_bus_info[i].time_bus->is_connected())
+            {
+                sim_logger->info("time bus disconnected... reconnecting");
+                _time_bus_info[i].time_bus.reset(new NosEngine::Client::Bus(_hub, _time_bus_info[i].time_uri, _time_bus_info[i].time_bus_name));
+                _time_bus_info[i].time_bus->enable_set_time();
+            }
+            _time_bus_info[i].time_bus->set_time(_time_counter);
+        }
+    }
+
+    void TimeDriver::update_display(void)
+    {
+        int32_t year, month, day, hour, minute;
+        double second;
+
+        wmove(stdscr, 0, 0);
+        double abs_time = _absolute_start_time + (double(_time_counter * _sim_microseconds_per_tick)) / 1000000.0;
+        SimCoordinateTransformations::AbsTime2YMDHMS(abs_time, year, month, day, hour, minute, second);
+        double speed_up = ((double)_sim_microseconds_per_tick) / ((double)_real_microseconds_per_tick);
+        printw("TimeDriver::send_tick_to_nos_engine:\n");
+        printw("  tick = %d, absolute time = %f = %4.4d/%2.2d/%2.2dT%2.2d:%2.2d:%05.2f\n", _time_counter, abs_time, year, month, day, hour, minute, second);
+        printw("  real microseconds per tick = %d, ", _real_microseconds_per_tick);
+        printw("attempted speed-up = %5.2f\n", speed_up);
+        printw("  actual speed-up = %5.2f, state = %s", (speed_up/10)/time_diff(), (_pause_ticks == _time_counter) ? "paused" : ((_pause_ticks < UINT_MAX) && (_pause_ticks > _time_counter)) ? "pausing" : "not paused");
+        if ((_pause_ticks < UINT_MAX) && (_pause_ticks > _time_counter)) printw(" at %f", _absolute_start_time + (double(_pause_ticks * _sim_microseconds_per_tick)) / 1000000.0);
+        printw("\n\nPress: 'p' to pause/unpause,\n       '+' to decrease delay by 2x,\n       '-' to increase delay by 2x\n");
+        printw(    "       'r <number>' to run <number> more seconds,\n       'u <number>' to run until <number> absolute time\n");
+        refresh();
+    }
+
+    double TimeDriver::time_diff(void)
+    {
+        double then, now, diff;
+
+        then = (double)_then.tv_sec*1000000 + (double)_then.tv_usec;
+        now = (double)_now.tv_sec*1000000 + (double)_now.tv_usec;
+
+        diff = (now - then)/1000000;
+
+        return diff;
     }
 
 }
