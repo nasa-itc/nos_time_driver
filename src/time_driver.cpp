@@ -183,7 +183,7 @@ namespace Nos3
         double speed_up = ((double)_sim_microseconds_per_tick) / ((double)_real_microseconds_per_tick);
         printw("TimeDriver::send_tick_to_nos_engine:\n");
         printw("  tick = %d, absolute time = %f = %4.4d/%2.2d/%2.2dT%2.2d:%2.2d:%05.2f\n", _time_counter, abs_time, year, month, day, hour, minute, second);
-        printw("  real microseconds per tick = %d, ", _real_microseconds_per_tick);
+        printw("  real microseconds per tick = %ld, ", _real_microseconds_per_tick);
         printw("attempted speed-up = %5.2f\n", speed_up);
         printw("  actual speed-up = %5.2f, state = %s", (speed_up/10)/time_diff(), (_pause_ticks <= _time_counter) ? "paused" : ((_pause_ticks < UINT_MAX) && (_pause_ticks > _time_counter)) ? "pausing" : "not paused");
         if ((_pause_ticks < UINT_MAX) && (_pause_ticks > _time_counter)) printw(" at %f", _absolute_start_time + (double(_pause_ticks * _sim_microseconds_per_tick)) / 1000000.0);
