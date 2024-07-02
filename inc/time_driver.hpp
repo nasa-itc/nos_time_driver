@@ -56,6 +56,7 @@ namespace Nos3
         unsigned int                                   _display_counter;
         struct timeval                                 _now, _then;
         unsigned int                                   _pause_ticks;
+        double                                         _last_time_diff;
 
         struct TimeBusInfo {
             std::string                                 time_uri;
