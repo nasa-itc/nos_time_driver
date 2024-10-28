@@ -120,7 +120,8 @@ namespace Nos3
     			int64_t ticks_per_second = 1000000/_real_microseconds_per_tick;
                 _then = _now;
                 
-                if ((_display_counter % (ticks_per_second/10)) == 0) { // only report about every 1/10th of a second
+                if (ticks_per_second < 10 ||  // prevent division by zero on the next line
+                    ((_display_counter % (ticks_per_second/10)) == 0)) { // only report about every 1/10th of a second
                     update_display();
                 }
 
@@ -131,13 +132,10 @@ namespace Nos3
                         else _pause_ticks = UINT_MAX;
                         break;
                     case '+':
-                        _real_microseconds_per_tick /= 2;
+                        if (100 * _real_microseconds_per_tick > _sim_microseconds_per_tick) _real_microseconds_per_tick /= 2; // no faster than 200x real time
                         break;
                     case '-':
-                        if (_real_microseconds_per_tick < 80000)
-                        {
-                            _real_microseconds_per_tick *= 2;
-                        }
+                        if (_real_microseconds_per_tick < _sim_microseconds_per_tick * 100) _real_microseconds_per_tick *= 2; // no slower than 0.005x real time
                         break;
                     case 'r':
                     case 'R':
