@@ -120,7 +120,8 @@ namespace Nos3
     			int64_t ticks_per_second = 1000000/_real_microseconds_per_tick;
                 _then = _now;
                 
-                if ((_display_counter % (ticks_per_second/10)) == 0) { // only report about every 1/10th of a second
+                if (ticks_per_second < 10 ||  // prevent division by zero on the next line
+                    ((_display_counter % (ticks_per_second/10)) == 0)) { // only report about every 1/10th of a second
                     update_display();
                 }
 
@@ -131,10 +132,10 @@ namespace Nos3
                         else _pause_ticks = UINT_MAX;
                         break;
                     case '+':
-                        _real_microseconds_per_tick /= 2;
+                        if (100 * _real_microseconds_per_tick > _sim_microseconds_per_tick) _real_microseconds_per_tick /= 2; // no faster than 200x real time
                         break;
                     case '-':
-                        _real_microseconds_per_tick *= 2;
+                        if (_real_microseconds_per_tick < _sim_microseconds_per_tick * 100) _real_microseconds_per_tick *= 2; // no slower than 0.005x real time
                         break;
                     case 'r':
                     case 'R':
@@ -193,9 +194,9 @@ namespace Nos3
         printw("  tick = %d, absolute time = %f = %4.4d/%2.2d/%2.2dT%2.2d:%2.2d:%05.2f\n", _time_counter, abs_time, year, month, day, hour, minute, second);
         printw("  real microseconds per tick = %ld, ", _real_microseconds_per_tick);
         printw("attempted speed-up = %5.2f\n", speed_up);
-        printw("  actual speed-up = %5.2f, state = %s", actual_speed_up, (_pause_ticks <= _time_counter) ? "paused" : ((_pause_ticks < UINT_MAX) && (_pause_ticks > _time_counter)) ? "pausing" : "not paused");
+        printw("  actual speed-up = %5.2f, state = %s", actual_speed_up, (_pause_ticks <= _time_counter) ? "paused" : ((_pause_ticks < UINT_MAX) && (_pause_ticks > _time_counter)) ? "pausing" : "playing");
         if ((_pause_ticks < UINT_MAX) && (_pause_ticks > _time_counter)) printw(" at %f", _absolute_start_time + (double(_pause_ticks * _sim_microseconds_per_tick)) / 1000000.0);
-        printw("\n\nPress: 'p' to pause/unpause,\n       '+' to decrease delay by 2x,\n       '-' to increase delay by 2x\n");
+        printw("\n\nPress: 'p' to pause/play,\n       '+' to decrease delay by 2x,\n       '-' to increase delay by 2x\n");
         printw(    "       'r <number>' to run <number> more seconds,\n       'u <number>' to run until <number> absolute time\n");
         refresh();
     }
