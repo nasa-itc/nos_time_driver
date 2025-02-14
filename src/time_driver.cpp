@@ -99,6 +99,9 @@ namespace Nos3
 
     void TimeDriver::run(void)
     {
+        gettimeofday(&_now, NULL);
+        _then = _now;
+
         if (_active) 
         {
             initscr();
