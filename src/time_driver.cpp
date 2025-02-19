@@ -99,6 +99,9 @@ namespace Nos3
 
     void TimeDriver::run(void)
     {
+        gettimeofday(&_now, NULL);
+        _then = _now;
+
         if (_active) 
         {
             initscr();
@@ -108,38 +111,45 @@ namespace Nos3
             noecho();
             int key = getch();
             double pause_duration, pause_at;
+
             while (1) 
             {
-                std::this_thread::sleep_for(std::chrono::microseconds(_real_microseconds_per_tick));
-    			int64_t ticks_per_second = 1000000/_real_microseconds_per_tick;
-                if ((_display_counter % (ticks_per_second/10)) == 0) { // only report about every 1/10th of a second
-                    _then = _now;
+                do {
+                    //std::this_thread::sleep_for(std::chrono::microseconds(_real_microseconds_per_tick/10));
                     gettimeofday(&_now, NULL);
+                    _last_time_diff = time_diff();
+                } while (_last_time_diff < _real_microseconds_per_tick);
+
+    			int64_t ticks_per_second = 1000000/_real_microseconds_per_tick;
+                _then = _now;
+                
+                if (ticks_per_second < 10 ||  // prevent division by zero on the next line
+                    ((_display_counter % (ticks_per_second/10)) == 0)) { // only report about every 1/10th of a second
                     update_display();
                 }
 
                 switch(key) {
-                case 'p':
-                case 'P':
-                    if (_pause_ticks == UINT_MAX) _pause_ticks = _time_counter;
-                    else _pause_ticks = UINT_MAX;
-                    break;
-                case '+':
-                    _real_microseconds_per_tick /= 2;
-                    break;
-                case '-':
-                    _real_microseconds_per_tick *= 2;
-                    break;
-                case 'r':
-                case 'R':
-                    scanf("%lf", &pause_duration);
-                    _pause_ticks = _time_counter + pause_duration * 1000000 / _sim_microseconds_per_tick;
-                    break;
-                case 'u':
-                case 'U':
-                    scanf("%lf", &pause_at);
-                    _pause_ticks = (pause_at - _absolute_start_time) * 1000000 / _sim_microseconds_per_tick;
-                    break;
+                    case 'p':
+                    case 'P':
+                        if (_pause_ticks == UINT_MAX) _pause_ticks = _time_counter;
+                        else _pause_ticks = UINT_MAX;
+                        break;
+                    case '+':
+                        if (100 * _real_microseconds_per_tick > _sim_microseconds_per_tick) _real_microseconds_per_tick /= 2; // no faster than 200x real time
+                        break;
+                    case '-':
+                        if (_real_microseconds_per_tick < _sim_microseconds_per_tick * 100) _real_microseconds_per_tick *= 2; // no slower than 0.005x real time
+                        break;
+                    case 'r':
+                    case 'R':
+                        scanf("%lf", &pause_duration);
+                        _pause_ticks = _time_counter + pause_duration * 1000000 / _sim_microseconds_per_tick;
+                        break;
+                    case 'u':
+                    case 'U':
+                        scanf("%lf", &pause_at);
+                        _pause_ticks = (pause_at - _absolute_start_time) * 1000000 / _sim_microseconds_per_tick;
+                        break;
                 }
 
                 if (_time_counter < _pause_ticks) {
@@ -181,13 +191,15 @@ namespace Nos3
         double abs_time = _absolute_start_time + (double(_time_counter * _sim_microseconds_per_tick)) / 1000000.0;
         SimCoordinateTransformations::AbsTime2YMDHMS(abs_time, year, month, day, hour, minute, second);
         double speed_up = ((double)_sim_microseconds_per_tick) / ((double)_real_microseconds_per_tick);
+        double actual_speed_up = (double)_sim_microseconds_per_tick / _last_time_diff;
+
         printw("TimeDriver::send_tick_to_nos_engine:\n");
         printw("  tick = %d, absolute time = %f = %4.4d/%2.2d/%2.2dT%2.2d:%2.2d:%05.2f\n", _time_counter, abs_time, year, month, day, hour, minute, second);
         printw("  real microseconds per tick = %ld, ", _real_microseconds_per_tick);
         printw("attempted speed-up = %5.2f\n", speed_up);
-        printw("  actual speed-up = %5.2f, state = %s", (speed_up/10)/time_diff(), (_pause_ticks <= _time_counter) ? "paused" : ((_pause_ticks < UINT_MAX) && (_pause_ticks > _time_counter)) ? "pausing" : "not paused");
+        printw("  actual speed-up = %5.2f, state = %s", actual_speed_up, (_pause_ticks <= _time_counter) ? "paused" : ((_pause_ticks < UINT_MAX) && (_pause_ticks > _time_counter)) ? "pausing" : "playing");
         if ((_pause_ticks < UINT_MAX) && (_pause_ticks > _time_counter)) printw(" at %f", _absolute_start_time + (double(_pause_ticks * _sim_microseconds_per_tick)) / 1000000.0);
-        printw("\n\nPress: 'p' to pause/unpause,\n       '+' to decrease delay by 2x,\n       '-' to increase delay by 2x\n");
+        printw("\n\nPress: 'p' to pause/play,\n       '+' to decrease delay by 2x,\n       '-' to increase delay by 2x\n");
         printw(    "       'r <number>' to run <number> more seconds,\n       'u <number>' to run until <number> absolute time\n");
         refresh();
     }
@@ -199,7 +211,7 @@ namespace Nos3
         then = (double)_then.tv_sec*1000000 + (double)_then.tv_usec;
         now = (double)_now.tv_sec*1000000 + (double)_now.tv_usec;
 
-        diff = (now - then)/1000000;
+        diff = (now - then);
 
         return diff;
     }
